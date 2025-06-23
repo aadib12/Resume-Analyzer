@@ -6,7 +6,7 @@ A Python-based application that analyzes resumes to extract key information, ass
 
 - Resume Parsing: Extracts text and key details from resumes.
 - Skill Assessment: Evaluates the presence and relevance of skills.
-- Feedback Generation: Provides suggestions for improving resume content.
+- ATS Score: Provides an ATS score according to the JD
 
 ## Prerequisites
 
