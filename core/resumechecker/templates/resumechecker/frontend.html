@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resume vs JD Matcher</title>
+<style>
+  body {
+  font-family: Arial, sans-serif;
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 20px;
+  background: #f0f0f0;           /* light neutral background */
+  border-radius: 8px;
+}
+
+h2 {
+  text-align: center;
+  color: #222;                   /* dark text for good contrast */
+}
+
+label {
+  color: #2a2a2a;               /* dark gray for labels */
+  font-weight: bold;
+  display: block;
+  margin-top: 20px;
+}
+
+input[type="file"],
+select,
+textarea {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  font-size: 1rem;
+  border: 1px solid #ccc;       /* subtle border */
+  border-radius: 4px;
+  background: white;
+  color: #222;
+}
+
+button {
+  margin-top: 24px;
+  padding: 10px 20px;
+  font-size: 1.1rem;
+  background-color: #0056b3;     /* medium blue */
+  border: none;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+#result {
+  margin-top: 30px;
+  background: #d4edda;           /* light green background */
+  padding: 15px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  color: #155724;                /* dark green text */
+}
+
+#error {
+  margin-top: 30px;
+  background: #f8d7da;           /* light red background */
+  padding: 15px;
+  border-radius: 6px;
+  color: #721c24;                /* dark red text */
+}
+</style>
+</head>
+<body>
+
+<h2>Resume Analyzer</h2>
+
+<form id="matchForm">
+  <label for="resume">Upload Resume (PDF):</label>
+  <input type="file" id="resume" name="resume" accept="application/pdf" required />
+
+  <label for="jobDescription">Select Job Description:</label>
+  <select id="jobDescription" name="job_description" required>
+    <option value="">Loading job descriptions...</option>
+  </select>
+
+  <button type="submit">Analyze Resume</button>
+</form>
+
+<div id="result" style="display:none;"></div>
+<div id="error" style="display:none;"></div>
+
+<script>
+   // Get CSRF token from cookie
+   function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+              const cookie = cookies[i].trim();
+              // Does this cookie string begin with the name we want?
+              if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                  cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                  break;
+              }
+          }
+      }
+      return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  const jobDescSelect = document.getElementById('jobDescription');
+  const form = document.getElementById('matchForm');
+  const resultDiv = document.getElementById('result');
+  const errorDiv = document.getElementById('error');
+
+  // Fetch job descriptions to populate dropdown
+  async function loadJobDescriptions() {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/jobs/'); // jobs url
+      const data = await response.json();
+      console.log("Raw response:", data);
+      if(data.status && data.data.length > 0) {
+        jobDescSelect.innerHTML = '<option value="">-- Select Job Description --</option>';
+        data.data.forEach(job => {
+          const option = document.createElement('option');
+          option.value = job.id;
+          option.textContent = job.job_title;
+          jobDescSelect.appendChild(option);
+        });
+      } else {
+        jobDescSelect.innerHTML = '<option value="">No job descriptions available</option>';
+      }
+    } catch (err) {
+      jobDescSelect.innerHTML = '<option value="">Failed to load job descriptions</option>';
+      console.error(err);
+    }
+  }
+
+  loadJobDescriptions();
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    resultDiv.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    const resumeFile = document.getElementById('resume').files[0];
+    const jobDescId = jobDescSelect.value;
+
+    if(!resumeFile) {
+      alert('Please upload a resume file.');
+      return;
+    }
+    if(!jobDescId) {
+      alert('Please select a job description.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('resume', resumeFile);
+    formData.append('job_description', jobDescId);
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/resume/', { 
+  method: 'POST',
+  headers: {
+    'X-CSRFToken': csrftoken
+  },
+  body: formData
+});
+      
+
+      const resData = await response.json();
+      // console.log("Raw response:", resData);
+
+      if(resData.status) {
+        resultDiv.style.display = 'block';
+        errorDiv.style.display = 'none';
+        const data = resData.data;
+
+resultDiv.innerHTML = `
+  <h3>Resume Analysis Result</h3>
+  <p><strong>Relevance Rank:</strong> ${data.rank} / 100</p>
+  <p><strong>Total Experience:</strong> ${data.total_experience} years</p>
+  <p><strong>Skills:</strong> ${Array.isArray(data.skills) ? data.skills.join(', ') : data.skills}</p>
+  <p><strong>Project Categories:</strong> ${Array.isArray(data.project_category) ? data.project_category.join(', ') : data.project_category}</p>
+`;      } else {
+        resultDiv.style.display = 'none';
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = resData.message || 'Failed to analyze resume.';
+      }
+    } catch (error) {
+      resultDiv.style.display = 'none';
+      errorDiv.style.display = 'block';
+      errorDiv.textContent = 'Error: ' + error.message;
+    }
+  });
+</script>
+
+</body>
+</html>
