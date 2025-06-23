@@ -1,5 +1,4 @@
 # Resume-Analyzer
-# Resume Analyzer
 
 A Python-based application that analyzes resumes to extract key information, assess skills, and provide feedback to enhance your resume's effectiveness.
 
